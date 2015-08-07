@@ -1,16 +1,22 @@
+OBJECTS=obj/loader.o obj/kmain.o
 LINKER=ld
-LINKER_FLAGS=-melf_i386
-ASM=nasm
-ASM_FLAGS=-f elf32
+LINKER_FLAGS=-T src/link.ld -melf_i386
+AS=nasm
+ASFLAGS=-f elf32
+CC=gcc
+CFLAGS=-m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
+       -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
+OUT_O_DIR=obj
 
-all: iso
+dir_guard=mkdir -p $(@D)
 
-run: iso
+all: os.iso
+
+run: os.iso
 	bochs -f bochsrc.txt -q
 
-iso: iso/boot/kernel.elf
-	mkdir -p iso/boot/grub
-	cp grub/* iso/boot/grub/
+os.iso: iso/boot/grub/stage2_eltorito iso/boot/kernel.elf
+	$(dir_guard)
 	genisoimage -R \
 		-b boot/grub/stage2_eltorito \
 		-no-emul-boot                   \
@@ -22,16 +28,21 @@ iso: iso/boot/kernel.elf
 		-o os.iso                       \
 		iso
 
-iso/boot/kernel.elf: obj/loader.o
-	mkdir -p iso/boot
-	$(LINKER) -T src/link.ld $(LINKER_FLAGS) obj/loader.o -o iso/boot/kernel.elf
+iso/boot/grub/stage2_eltorito:
+	$(dir_guard)
+	cp grub/* iso/boot/grub/
 
-obj/loader.o: src/loader.s
-	$(ASM) $(ASM_FLAGS) src/loader.s -o obj/loader.o
+iso/boot/kernel.elf: $(OBJECTS)
+	$(dir_guard)
+	$(LINKER) $(LINKER_FLAGS) $(OBJECTS) -o iso/boot/kernel.elf
+
+$(OUT_O_DIR)/%.o: src/%.c
+	$(dir_guard)
+	$(CC) $(CFLAGS) $< -o $@
+
+$(OUT_O_DIR)/%.o: src/%.s
+	$(dir_guard)
+	$(AS) $(ASFLAGS) $< -o $@
 
 clean:
-	rm -f iso/boot/kernel.elf
-	rm -f iso/boot/grub/stage2_eltorito
-	rm -f obj/*
-	rm os.iso
-	rm -f bochslog.txt
+	rm -rf iso obj os.iso bochslog.txt

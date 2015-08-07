@@ -1,3 +1,5 @@
 os.iso
 bochslog.txt
 *.swp
+obj/
+iso/
